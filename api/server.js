@@ -333,6 +333,33 @@ app.delete('/api', (req, res) => {
   });
 });
 
+// Delete one selected entry
+app.delete('/api/:id', (req, res) => {
+  const { id } = req.params;
+
+  db.get('SELECT * FROM inspirations WHERE id = ?', [id], (err, existing) => {
+    if (err) {
+      return res.status(500).json({ error: err.message });
+    }
+
+    if (!existing) {
+      return res.status(404).json({ error: 'Inspiration not found.' });
+    }
+
+    db.run('DELETE FROM inspirations WHERE id = ?', [id], function (deleteErr) {
+      if (deleteErr) {
+        return res.status(500).json({ error: err.message });
+      }
+
+      if (existing.visual) {
+        deleteFileIfExists(existing.visual);
+      }
+
+      res.json({ message: 'Inspiration deleted successfully.' });
+    });
+  });
+});
+
 // Generic error handling
 app.use((err, req, res, next) => {
   if (err instanceof multer.MulterError || err) {
