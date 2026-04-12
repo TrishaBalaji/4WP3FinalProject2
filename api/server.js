@@ -165,6 +165,39 @@ app.get('/api/:id', (req, res) => {
   });
 });
 
+// CREATE inspiration with optional PNG upload
+app.post('/api', upload.single('visual'), (req, res) => {
+  const { summary, explanation, priority } = req.body;
+  const parsedPriority = Number(priority);
+
+  if (!summary || !explanation || !Number.isInteger(parsedPriority) || parsedPriority < 1 || parsedPriority > 10) {
+    if (req.file) fs.unlinkSync(req.file.path);
+    return res.status(400).json({
+      error: 'summary and explanation are required, and priority must be an integer between 1 and 10.'
+    });
+  }
+
+  const visualPath = req.file ? `uploads/${req.file.filename}` : null;
+
+  db.run(
+    'INSERT INTO inspirations (summary, explanation, visual, priority) VALUES (?, ?, ?, ?)',
+    [summary, explanation, visualPath, parsedPriority],
+    function (err) {
+      if (err) {
+        if (req.file) fs.unlinkSync(req.file.path);
+        return res.status(500).json({ error: err.message });
+      }
+
+      db.get('SELECT * FROM inspirations WHERE id = ?', [this.lastID], (selectErr, row) => {
+        if (selectErr) {
+          return res.status(500).json({ error: selectErr.message });
+        }
+        res.status(201).json(row);
+      });
+    }
+  );
+});
+
 // Generic error handling
 app.use((err, req, res, next) => {
   if (err instanceof multer.MulterError || err) {
