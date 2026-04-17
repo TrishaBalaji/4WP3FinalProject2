@@ -312,13 +312,11 @@ const styles = StyleSheet.create({
     flex: 4,
     backgroundColor: '#DFFFFF',
     padding: 10,
-    justifyContent: 'center'
   },
   formSection: {
     flex: 3,
     backgroundColor: '#fbe9fc',
     padding: 12,
-    justifyContent: 'center'
   },
   field: {
     marginBottom: 10
@@ -387,6 +385,7 @@ const styles = StyleSheet.create({
   blue: { backgroundColor: '#c7dcff' },
   red: { backgroundColor: '#ffd1d1' },
   darkRed: { backgroundColor: '#ffb3b3' },
+  peach: { backgroundColor: '#FEEBE7' },
   gray: { backgroundColor: '#ddd' }
 });
   
