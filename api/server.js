@@ -6,19 +6,24 @@ const cors = require('cors');
 const app = express();
 const PORT = 3000;
 
+// Middleware
 const allowedOrigins = ['http://localhost:8081'];
 
-app.use((req, res, next) => {const origin = req.headers.origin;
-if (allowedOrigins.includes(origin)) {
-res.header('Access-Control-Allow-Origin', origin);
-}
-res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-if (req.method === 'OPTIONS') {
-return res.status(200).end();
-}
-next();
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
 
+  if (allowedOrigins.includes(origin)) {
+    res.header('Access-Control-Allow-Origin', origin);
+  }
+
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(200);
+  }
+
+  next();
 });
 
 app.use(cors({
@@ -30,7 +35,7 @@ app.use(cors({
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// SQLite setup
+// -------------------- Database --------------------
 const dbPath = path.join(__dirname, 'database.db');
 const db = new sqlite3.Database(dbPath, (err) => {
   if (err) {
@@ -38,7 +43,7 @@ const db = new sqlite3.Database(dbPath, (err) => {
     return;
   }
 
-    console.log('Connected to SQLite database.');
+  console.log('Connected to SQLite database.');
   initializeDatabase();
 });
 
@@ -52,15 +57,24 @@ function initializeDatabase() {
       priority INTEGER NOT NULL CHECK(priority >= 1 AND priority <= 10)
     );
   `;
+
+  db.run(createTableSQL, (err) => {
+    if (err) {
+      console.error('Error creating table:', err.message);
+      return;
+    }
+
     seedDatabaseIfEmpty();
   });
 }
+
 function seedDatabaseIfEmpty() {
   db.get('SELECT COUNT(*) AS count FROM inspirations', (err, row) => {
     if (err) {
       console.error('Error checking inspirations count:', err.message);
       return;
     }
+
     if (!row) {
       console.error('Count query returned no row.');
       return;
@@ -93,65 +107,78 @@ function seedDatabaseIfEmpty() {
   });
 }
 
-//Endpoints
+// Routes
 
 // GET all inspirations
 app.get('/api', (req, res) => {
-  db.all('SELECT * FROM inspirations ORDER BY priority DESC, id ASC', [], (err, rows) => {
-    if (err) {
-      return res.status(500).json({ error: err.message });
+  db.all(
+    'SELECT * FROM inspirations ORDER BY priority DESC, id ASC',
+    [],
+    (err, rows) => {
+      if (err) {
+        return res.status(500).json({ error: err.message });
+      }
+
+      res.json(rows);
     }
-    res.json(rows);
-  });
+  );
 });
 
 // GET one inspiration by id
 app.get('/api/:id', (req, res) => {
   const { id } = req.params;
+
   db.get('SELECT * FROM inspirations WHERE id = ?', [id], (err, row) => {
     if (err) {
       return res.status(500).json({ error: err.message });
     }
+
     if (!row) {
       return res.status(404).json({ error: 'Inspiration not found.' });
     }
+
     res.json(row);
   });
 });
 
-//POST create new inspiration
+// POST create new inspiration
 app.post('/api', (req, res) => {
   const { summary, explanation, priority } = req.body;
   const parsedPriority = Number(priority);
 
-  if (!summary || !explanation || !Number.isInteger(parsedPriority) || parsedPriority < 1 || parsedPriority > 10) {
+  if (
+    !summary ||
+    !explanation ||
+    !Number.isInteger(parsedPriority) ||
+    parsedPriority < 1 ||
+    parsedPriority > 10
+  ) {
     return res.status(400).json({
       error: 'summary and explanation are required, and priority must be an integer between 1 and 10.'
     });
   }
 
   const insertSQL = `
-    INSERT INTO inspirations (summary, explanation, visual, priority) VALUES (?, ?, ?, ?)`,
-    [summary, explanation, null, parsedPriority],
-    function (err) {
-      if (err) {
-        return res.status(500).json({ error: err.message });
+    INSERT INTO inspirations (summary, explanation, visual, priority)
+    VALUES (?, ?, ?, ?)
+  `;
+
+  db.run(insertSQL, [summary, explanation, null, parsedPriority], function (err) {
+    if (err) {
+      return res.status(500).json({ error: err.message });
+    }
+
+    db.get('SELECT * FROM inspirations WHERE id = ?', [this.lastID], (selectErr, row) => {
+      if (selectErr) {
+        return res.status(500).json({ error: selectErr.message });
       }
 
-      db.get('SELECT * FROM inspirations WHERE id = ?', [this.lastID], (selectErr, row) => {
-        if (selectErr) {
-          return res.status(500).json({ error: selectErr.message });
-        }
-        res.status(201).json(row);
-      });
-    }
-  );
+      res.status(201).json(row);
+    });
+  });
 });
 
-//Deleted 'Update All' route because it doesn't make sense to implement with the front end 
-//Only one form to update one entry at a time 
-
-// Update one selected entry by completing a PUT request to /api/:id
+// PUT update one inspiration
 app.put('/api/:id', (req, res) => {
   const { id } = req.params;
   const { summary, explanation, priority } = req.body;
@@ -159,12 +186,10 @@ app.put('/api/:id', (req, res) => {
 
   db.get('SELECT * FROM inspirations WHERE id = ?', [id], (err, existing) => {
     if (err) {
-      if (req.file) fs.unlinkSync(req.file.path);
       return res.status(500).json({ error: err.message });
     }
 
     if (!existing) {
-      if (req.file) fs.unlinkSync(req.file.path);
       return res.status(404).json({ error: 'Inspiration not found.' });
     }
 
@@ -172,7 +197,13 @@ app.put('/api/:id', (req, res) => {
     const updatedExplanation = explanation ?? existing.explanation;
     const updatedPriority = priority !== undefined ? parsedPriority : existing.priority;
 
-    if (!updatedSummary || !updatedExplanation || !Number.isInteger(updatedPriority) || updatedPriority < 1 || updatedPriority > 10) {
+    if (
+      !updatedSummary ||
+      !updatedExplanation ||
+      !Number.isInteger(updatedPriority) ||
+      updatedPriority < 1 ||
+      updatedPriority > 10
+    ) {
       return res.status(400).json({
         error: 'summary and explanation are required, and priority must be an integer between 1 and 10.'
       });
@@ -183,7 +214,8 @@ app.put('/api/:id', (req, res) => {
       SET summary = ?, explanation = ?, priority = ?
       WHERE id = ?
     `;
-        db.run(updateSQL, [updatedSummary, updatedExplanation, updatedPriority, id], function (updateErr) {
+
+    db.run(updateSQL, [updatedSummary, updatedExplanation, updatedPriority, id], function (updateErr) {
       if (updateErr) {
         return res.status(500).json({ error: updateErr.message });
       }
@@ -191,27 +223,29 @@ app.put('/api/:id', (req, res) => {
       db.get('SELECT * FROM inspirations WHERE id = ?', [id], (selectErr, row) => {
         if (selectErr) {
           return res.status(500).json({ error: selectErr.message });
-          res.json(row);
+        }
+
+        res.json(row);
       });
     });
   });
 });
 
-
-// Delete all entries
+// DELETE all inspirations
 app.delete('/api', (req, res) => {
-  db.run('DELETE * FROM inspirations', [], function(err, rows) => {
+  db.run('DELETE FROM inspirations', [], function (err) {
     if (err) {
       return res.status(500).json({ error: err.message });
     }
-      res.json({
-        message: 'All inspirations deleted successfully.',
-        changes: this.changes
+
+    res.json({
+      message: 'All inspirations deleted successfully.',
+      changes: this.changes
     });
   });
 });
 
-// Delete one selected entry
+// DELETE one inspiration
 app.delete('/api/:id', (req, res) => {
   const { id } = req.params;
 
@@ -234,6 +268,7 @@ app.delete('/api/:id', (req, res) => {
   });
 });
 
+// Start Server
 app.listen(PORT, () => {
-  console.log(`Server is running on http://localhost:${PORT}`);
+  console.log(`Server is running on http://localhost:${PORT}/api`);
 });
