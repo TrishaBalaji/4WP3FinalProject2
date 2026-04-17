@@ -72,67 +72,6 @@ db.get("SELECT COUNT(*) AS count FROM inspirations", (err, row) => {
   }
 });
 
-
-// Home page: simple HTML table of all inspirations
-app.get('/', (req, res) => {
-  db.all('SELECT * FROM inspirations ORDER BY priority DESC, id ASC', [], (err, rows) => {
-    if (err) {
-      return res.status(500).send('Error fetching inspirations.');
-    }
-
-    const tableRows = rows.map(item => `
-      <tr>
-        <td>${item.id}</td>
-        <td>${item.summary}</td>
-        <td>${item.explanation}</td>
-        <td>${item.visual ? `<img src="/${item.visual}" alt="visual" width="100" />` : 'No image'}</td>
-        <td>${item.priority}</td>
-      </tr>
-    `).join('');
-
-    res.send(`
-      <!DOCTYPE html>
-      <html lang="en">
-      <head>
-        <meta charset="UTF-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <title>Art Inspirations</title>
-        <style>
-          body { font-family: Arial, sans-serif; margin: 40px; }
-          table { border-collapse: collapse; width: 100%; }
-          th, td { border: 1px solid #ccc; padding: 10px; text-align: left; vertical-align: top; }
-          th { background: #f4f4f4; }
-          img { border-radius: 6px; }
-          .note { margin-bottom: 20px; color: #444; }
-        </style>
-      </head>
-      <body>
-        <h1>Art Inspirations</h1>
-        <p class="note">
-          Table fields: <strong>id</strong> (INTEGER), <strong>summary</strong> (TEXT),
-          <strong>explanation</strong> (TEXT), <strong>visual</strong> (stored as uploaded PNG path in SQLite),
-          and <strong>priority</strong> (INTEGER 1-10).
-        </p>
-        <table>
-          <thead>
-            <tr>
-              <th>id</th>
-              <th>summary</th>
-              <th>explanation</th>
-              <th>visual</th>
-              <th>priority</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${tableRows || '<tr><td colspan="5">No inspirations found.</td></tr>'}
-          </tbody>
-        </table>
-      </body>
-      </html>
-    `);
-  });
-});
-
 // GET all inspirations
 app.get('/api', (req, res) => {
   db.all('SELECT * FROM inspirations ORDER BY priority DESC, id ASC', [], (err, rows) => {
