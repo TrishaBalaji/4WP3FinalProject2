@@ -50,7 +50,13 @@ export default function Index() {
   useEffect(() => {
     fetchData();
   }, []);
-  
+
+   function clearForm() {
+    setSelectedId('');
+    setSummary('');
+    setExplanation('');
+    setPriority('');
+  }
   function loadIntoForm(item: Inspiration) {
     setSelectedId(String(item.id));
     setSummary(item.summary);
@@ -80,9 +86,76 @@ return (
         />
       </View>
 
-      <View style={styles.formSection}>
-        <Text style={styles.placeholderText}>Form controls coming next.</Text>
-      </View>
+      <ScrollView style={styles.formSection}>
+        <View style={styles.field}>
+          <Text style={styles.label}>ID:</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="ID for update/delete"
+            value={selectedId}
+            onChangeText={setSelectedId}
+            keyboardType="numeric"
+          />
+        </View>
+
+        <View style={styles.field}>
+          <Text style={styles.label}>Summary:</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="Summary"
+            value={summary}
+            onChangeText={setSummary}
+          />
+        </View>
+
+        <View style={styles.field}>
+          <Text style={styles.label}>Explanation:</Text>
+          <TextInput
+            style={[styles.input, styles.largeInput]}
+            placeholder="Explanation"
+            value={explanation}
+            onChangeText={setExplanation}
+            multiline
+          />
+        </View>
+
+        <View style={styles.field}>
+          <Text style={styles.label}>Priority:</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="Priority (1-10)"
+            value={priority}
+            onChangeText={setPriority}
+            keyboardType="numeric"
+          />
+        </View>
+
+        <View style={styles.buttonRow}>
+          <Pressable style={[styles.button, styles.green]}>
+            <Text style={styles.buttonText}>Create</Text>
+          </Pressable>
+
+          <Pressable style={[styles.button, styles.blue]}>
+            <Text style={styles.buttonText}>Update</Text>
+          </Pressable>
+        </View>
+
+        <View style={styles.buttonRow}>
+          <Pressable style={[styles.button, styles.red]}>
+            <Text style={styles.buttonText}>Delete</Text>
+          </Pressable>
+
+          <Pressable style={[styles.button, styles.darkRed]}>
+            <Text style={styles.buttonText}>Delete All</Text>
+          </Pressable>
+        </View>
+
+        <View style={styles.buttonRow}>
+          <Pressable style={[styles.button, styles.gray]} onPress={clearForm}>
+            <Text style={styles.buttonText}>Clear</Text>
+          </Pressable>
+        </View>
+      </ScrollView>
     </View>
   );
 }
@@ -146,6 +219,40 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 30,
     fontSize: 16
-  }
+  },
+  input: {
+    borderWidth: 2,
+    borderColor: '#aaa',
+    backgroundColor: 'white',
+    borderRadius: 6,
+    height: 44,
+    paddingHorizontal: 10
+  },
+  largeInput: {
+    height: 80,
+    textAlignVertical: 'top',
+    paddingTop: 10
+  },
+  buttonRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginBottom: 12
+  },
+  button: {
+    minWidth: 130,
+    height: 52,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 8
+  },
+  buttonText: {
+    fontSize: 18,
+    fontWeight: 'bold'
+  },
+  green: { backgroundColor: '#c1edbc' },
+  blue: { backgroundColor: '#c7dcff' },
+  red: { backgroundColor: '#ffd1d1' },
+  darkRed: { backgroundColor: '#ffb3b3' },
+  gray: { backgroundColor: '#ddd' }
 });
   
