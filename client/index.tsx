@@ -50,6 +50,14 @@ export default function Index() {
   useEffect(() => {
     fetchData();
   }, []);
+  
+  function loadIntoForm(item: Inspiration) {
+    setSelectedId(String(item.id));
+    setSummary(item.summary);
+    setExplanation(item.explanation);
+    setPriority(String(item.priority));
+    setMessage(`Loaded item ${item.id} into form.`);
+  }
  
 return (
     <View style={styles.container}>
@@ -57,7 +65,19 @@ return (
       <Text style={styles.message}>{message}</Text>
 
       <View style={styles.listSection}>
-        <Text style={styles.placeholderText}>Inspirations will appear here.</Text>
+        <FlatList
+          data={inspirations}
+          keyExtractor={(item) => item.id.toString()}
+          ListEmptyComponent={<Text style={styles.emptyText}>No inspirations found.</Text>}
+          renderItem={({ item }) => (
+            <Pressable style={styles.card} onPress={() => loadIntoForm(item)}>
+              <Text style={styles.cardTitle}>ID: {item.id} | {item.summary}</Text>
+              <Text style={styles.cardText}>{item.explanation}</Text>
+              <Text style={styles.cardText}>Priority: {item.priority}</Text>
+              <Text style={styles.tapHint}>Tap to load into form</Text>
+            </Pressable>
+          )}
+        />
       </View>
 
       <View style={styles.formSection}>
@@ -100,6 +120,32 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontSize: 16,
     color: '#555'
+  }
+  card: {
+    backgroundColor: 'white',
+    borderWidth: 1,
+    borderColor: '#ccc',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 10
+  },
+  cardTitle: {
+    fontSize: 18,
+    fontWeight: 'bold'
+  },
+  cardText: {
+    fontSize: 15,
+    marginTop: 4
+  },
+  tapHint: {
+    marginTop: 6,
+    fontSize: 12,
+    color: '#666'
+  },
+  emptyText: {
+    textAlign: 'center',
+    marginTop: 30,
+    fontSize: 16
   }
 });
   
