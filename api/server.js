@@ -1,6 +1,6 @@
 const express = require('express');
 const sqlite3 = require('sqlite3').verbose();
-const multer = require('multer');
+const multer = require('multer'); //getting a multer error when pressing the create button 
 const path = require('path');
 const fs = require('fs');
 
