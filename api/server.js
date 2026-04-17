@@ -1,17 +1,10 @@
 const express = require('express');
 const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
-const fs = require('fs');
 const cors = require('cors');
 
 const app = express();
 const PORT = 3000;
-
-// Ensure uploads folder exists
-// const uploadsDir = path.join(__dirname, 'uploads');
-// if (!fs.existsSync(uploadsDir)) {
-//   fs.mkdirSync(uploadsDir, { recursive: true });
-// }
 
 const allowedOrigins = ['http://localhost:8081'];
 
@@ -38,39 +31,69 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // SQLite setup
-const db = new sqlite3.Database(path.join(__dirname, 'database.db'), (err) => {
+const dbPath = path.join(__dirname, 'database.db');
+const db = new sqlite3.Database(dbPath, (err) => {
   if (err) {
     console.error('Failed to connect to SQLite database:', err.message);
-  } else {
+    return;
+  }
+
     console.log('Connected to SQLite database.');
-  }
+  initializeDatabase();
 });
 
-// Note: SQLite does not have a native IMAGE type.
-// The visual field is stored as TEXT containing the uploaded PNG file path.
-db.run(`
-  CREATE TABLE IF NOT EXISTS inspirations (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    summary TEXT NOT NULL,
-    explanation TEXT NOT NULL,
-    visual TEXT,
-    priority INTEGER NOT NULL CHECK(priority >= 1 AND priority <= 10)
-  ); 
+function initializeDatabase() {
+  const createTableSQL = `
+    CREATE TABLE IF NOT EXISTS inspirations (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      summary TEXT NOT NULL,
+      explanation TEXT NOT NULL,
+      visual TEXT,
+      priority INTEGER NOT NULL CHECK(priority >= 1 AND priority <= 10)
+    );
+  `;
+    seedDatabaseIfEmpty();
+  });
+}
+function seedDatabaseIfEmpty() {
+  db.get('SELECT COUNT(*) AS count FROM inspirations', (err, row) => {
+    if (err) {
+      console.error('Error checking inspirations count:', err.message);
+      return;
+    }
+    if (!row) {
+      console.error('Count query returned no row.');
+      return;
+    }
 
-`);
+    if (row.count > 0) {
+      return;
+    }
 
-db.get("SELECT COUNT(*) AS count FROM inspirations", (err, row) => {
-  if (row.count === 0) {
-    db.run(`INSERT INTO inspirations (summary, explanation, visual, priority)
-      VALUES ('Neon Cityscape', 'A futuristic cyberpunk city...', '', 9)`);
+    const insertSQL = `
+      INSERT INTO inspirations (summary, explanation, visual, priority)
+      VALUES (?, ?, ?, ?)
+    `;
 
-    db.run(`INSERT INTO inspirations (summary, explanation, visual, priority)
-      VALUES ('Floating Islands', 'Massive islands drifting...', '', 8)`);
+    const seedData = [
+      ['Neon Cityscape', 'A futuristic cyberpunk city...', '', 9],
+      ['Floating Islands', 'Massive islands drifting...', '', 8],
+      ['Forest Spirit', 'A mystical creature...', '', 10]
+    ];
 
-    db.run(`INSERT INTO inspirations (summary, explanation, visual, priority)
-      VALUES ('Forest Spirit', 'A mystical creature...', '', 10)`);
-  }
-});
+    seedData.forEach((item) => {
+      db.run(insertSQL, item, (insertErr) => {
+        if (insertErr) {
+          console.error('Error inserting seed data:', insertErr.message);
+        }
+      });
+    });
+
+    console.log('Database seeded with default inspirations.');
+  });
+}
+
+//Endpoints
 
 // GET all inspirations
 app.get('/api', (req, res) => {
@@ -96,6 +119,7 @@ app.get('/api/:id', (req, res) => {
   });
 });
 
+//POST create new inspiration
 app.post('/api', (req, res) => {
   const { summary, explanation, priority } = req.body;
   const parsedPriority = Number(priority);
@@ -106,8 +130,8 @@ app.post('/api', (req, res) => {
     });
   }
 
-  db.run(
-    'INSERT INTO inspirations (summary, explanation, visual, priority) VALUES (?, ?, ?, ?)',
+  const insertSQL = `
+    INSERT INTO inspirations (summary, explanation, visual, priority) VALUES (?, ?, ?, ?)`,
     [summary, explanation, null, parsedPriority],
     function (err) {
       if (err) {
@@ -149,58 +173,40 @@ app.put('/api/:id', (req, res) => {
     const updatedPriority = priority !== undefined ? parsedPriority : existing.priority;
 
     if (!updatedSummary || !updatedExplanation || !Number.isInteger(updatedPriority) || updatedPriority < 1 || updatedPriority > 10) {
-      if (req.file) fs.unlinkSync(req.file.path);
       return res.status(400).json({
         error: 'summary and explanation are required, and priority must be an integer between 1 and 10.'
       });
     }
 
-    db.run(
-      'UPDATE inspirations SET summary = ?, explanation = ?, priority = ? WHERE id = ?',
-      [updatedSummary, updatedExplanation, updatedPriority, id],
-      function (updateErr) {
-        if (updateErr) {
-          if (req.file) fs.unlinkSync(req.file.path);
-          return res.status(500).json({ error: updateErr.message });
-        }
-
-        if (req.file && existing.visual) {
-          deleteFileIfExists(existing.visual);
-        }
-
-        db.get('SELECT * FROM inspirations WHERE id = ?', [id], (selectErr, row) => {
-          if (selectErr) {
-            return res.status(500).json({ error: selectErr.message });
-          }
-          res.json(row);
-        });
+    const updateSQL = `
+      UPDATE inspirations
+      SET summary = ?, explanation = ?, priority = ?
+      WHERE id = ?
+    `;
+        db.run(updateSQL, [updatedSummary, updatedExplanation, updatedPriority, id], function (updateErr) {
+      if (updateErr) {
+        return res.status(500).json({ error: updateErr.message });
       }
-    );
+
+      db.get('SELECT * FROM inspirations WHERE id = ?', [id], (selectErr, row) => {
+        if (selectErr) {
+          return res.status(500).json({ error: selectErr.message });
+          res.json(row);
+      });
+    });
   });
 });
 
+
 // Delete all entries
 app.delete('/api', (req, res) => {
-  db.all('SELECT * FROM inspirations', [], (err, rows) => {
+  db.run('DELETE * FROM inspirations', [], function(err, rows) => {
     if (err) {
       return res.status(500).json({ error: err.message });
     }
-
-    rows.forEach(item => {
-      if (item.visual) {
-        deleteFileIfExists(item.visual);
-      }
-    });
-
-    db.run('DELETE FROM inspirations', [], function (deleteErr) {
-      if (deleteErr) {
-        return res.status(500).json({ error: deleteErr.message });
-      }
-
       res.json({
         message: 'All inspirations deleted successfully.',
         changes: this.changes
-      });
     });
   });
 });
@@ -220,11 +226,7 @@ app.delete('/api/:id', (req, res) => {
 
     db.run('DELETE FROM inspirations WHERE id = ?', [id], function (deleteErr) {
       if (deleteErr) {
-        return res.status(500).json({ error: err.message });
-      }
-
-      if (existing.visual) {
-        deleteFileIfExists(existing.visual);
+        return res.status(500).json({ error: deleteErr.message });
       }
 
       res.json({ message: 'Inspiration deleted successfully.' });
